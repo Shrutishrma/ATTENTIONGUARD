@@ -1,0 +1,44 @@
+AttentionGuard — Question File Template (TXT / DOCX / PDF)
+======================================================
+Replace the questions below with your own. Keep the exact format:
+  - Questions start with a number followed by . or )
+  - Options use A) through D) — exactly 4 per question
+  - Every question must end with "Answer: X" (A, B, C, or D)
+  - Leave a blank line between questions (not required but helps readability)
+Remove this header block before uploading.
+======================================================
+
+1. What is the capital of France?
+A) London
+B) Berlin
+C) Paris
+D) Madrid
+Answer: C
+
+2. Which planet is known as the Red Planet?
+A) Venus
+B) Mars
+C) Jupiter
+D) Saturn
+Answer: B
+
+3. What is the chemical symbol for water?
+A) CO2
+B) NaCl
+C) H2O
+D) O2
+Answer: C
+
+4. Who wrote Romeo and Juliet?
+A) Charles Dickens
+B) Mark Twain
+C) Leo Tolstoy
+D) William Shakespeare
+Answer: D
+
+5. How many continents are there on Earth?
+A) 5
+B) 6
+C) 7
+D) 8
+Answer: C

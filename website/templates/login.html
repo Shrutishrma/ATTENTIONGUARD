@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AttentionGuard - Login</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="form">
+  <header class="headrule">
+    <div class="brand">
+      <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo">
+      <h1 class="AttentionGuard">Attention<span class="gold-text">Guard</span></h1>
+    </div>
+  </header>
+
+  <section class="formbody">
+    <div class="hero-showcase">
+      <div class="badge-premium">
+        AI-Powered Proctoring
+      </div>
+      <h2 class="hero-title">Your Exam, <br><span class="gold-gradient">Our Fortress.</span></h2>
+      <p class="hero-subtitle">AttentionGuard runs real-time behavioral diagnostics and identity verification directly in
+        your browser to safeguard absolute exam integrity.</p>
+
+      <div class="feature-grid">
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">👤</span>
+            <span class="feat-pulse"></span>
+          </div>
+          <div class="feat-text">
+            <h4>Live Identity Match</h4>
+            <p>1-to-1 facial recognition prevents proxy exam takers.</p>
+          </div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">👁️</span>
+          </div>
+          <div class="feat-text">
+            <h4>Gaze & Pose Tracking</h4>
+            <p>Detects looking away, squinting, or head rotations.</p>
+          </div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">🛡️</span>
+          </div>
+          <div class="feat-text">
+            <h4>Secure Browser Lock</h4>
+            <p>Locks fullscreen, blocks tab-switching and dev shortcuts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <h1 class="signin">Sign In</h1>
+
+      {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+      <div class="flashes">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">
+          {{ message }}
+          <button class="close-btn" onclick="this.parentElement.style.display='none';">&times;</button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <form action="" method="post">
+        <input class="input" type="text" id="regno" name="regno" placeholder="Register Number" required
+          autocomplete="username">
+        <input class="input" type="password" id="pw" name="pw" placeholder="Password" required
+          autocomplete="current-password">
+        <input class="input" type="text" id="code" name="code" placeholder="Test Code (students only)">
+        <div
+          style="font-family: var(--font-body); font-size: 11.5px; color: var(--text-secondary); opacity: 0.75; margin-top: -12px; margin-bottom: 20px; text-align: left; padding-left: 2px;">
+          ℹ️ Leave blank if signing in as a teacher.
+        </div>
+        <div class="wrap">
+          <button class="signbutton" type="submit">Sign In</button>
+        </div>
+      </form>
+
+      <div style="margin-top: 20px; text-align: center; font-family: var(--font-body); font-size: 13px; color: var(--text-secondary);">
+        Don't have an account? 
+        <a href="{{ url_for('auth.register') }}" style="color: var(--color-gold); font-weight: 600; text-decoration: none; transition: var(--transition-smooth); margin-left: 4px;">
+          Register here &rarr;
+        </a>
+      </div>
+
+      <div class="demo-instructions">
+        <strong>Try the Demo</strong>
+        <div class="demo-role">
+          <span>Student &nbsp;→&nbsp;</span>
+          <code>DEMO001</code> &middot; <code>demo123</code> &middot; <code>E4FFXV</code>
+        </div>
+        <div class="demo-role" style="margin-top: 6px;">
+          <span>Teacher &nbsp;→&nbsp;</span>
+          <code>DEMOTEACHER</code> &middot; <code>demo123</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Manipulate history to detect back button
+    history.pushState(null, null, location.href);
+    window.addEventListener('popstate', function (event) {
+      window.location.href = "{{ url_for('auth.logout') }}";
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttentionGuard — Exam Rules</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="rulesbody">
+    <header class="headrule">
+        <div class="brand">
+            <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo">
+            <h1 class="AttentionGuard">Attention<span class="gold-text">Guard</span></h1>
+        </div>
+        <div class="header-actions">
+            <span class="header-badge">
+                <span class="badge-dot"></span>
+                AI Proctor Active
+            </span>
+        </div>
+    </header>
+
+    <div class="containerrules">
+        <h1 class="headingrules">EXAM RULES & PROCTORING NOTICE</h1>
+        
+        <div class="contentrules">
+            <div id="video-container">
+                <video id="video" autoplay playsinline></video>
+                <p id="cameraStatus" class="camera-status">Checking camera...</p>
+                <canvas id="snapshotCanvas" width="640" height="480" style="display:none"></canvas>
+                <button class="signbutton" style="margin-top: 15px; width: 100%; border-radius: 10px; background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-hover) 100%);" id="registerFaceBtn" onclick="registerFace()" disabled>Verify & Register Face</button>
+            </div>
+            
+            <div class="therules">
+                <p class="headingrulestwo">Please read carefully before starting:</p>
+                <ul class="listrules">
+                    <li class="listyea"><strong>🎥 Webcam Required</strong> — Your face will be monitored throughout the exam using AI face recognition and eye tracking.</li>
+                    <li class="listyea"><strong>👁️ Eye & Gaze Tracking</strong> — Looking away from the screen, excessive blinking, or closing eyes for too long will trigger warnings.</li>
+                    <li class="listyea"><strong>🔍 Head Pose Detection</strong> — Turning your head away from the screen will be flagged.</li>
+                    <li class="listyea"><strong>👤 Face Verification</strong> — If another person's face appears or your face is not detected, a violation is recorded.</li>
+                    <li class="listyea"><strong>🖥️ Fullscreen Mode</strong> — The exam runs in fullscreen. Exiting fullscreen = violation.</li>
+                    <li class="listyea"><strong>🚫 No Tab Switching</strong> — Switching tabs or minimizing the browser will be detected.</li>
+                    <li class="listyea"><strong>⌨️ No Keyboard Shortcuts</strong> — DevTools, copy/paste, print, and other shortcuts are blocked.</li>
+                    <li class="listyea"><strong>⏱️ {{ duration_minutes }}-Minute Limit</strong> — The exam auto-submits when time runs out.</li>
+                    <li class="listyea"><strong>⚠️ 6-Warning Limit</strong> — After 6 violations, you will be automatically disqualified and banned.</li>
+                </ul>
+                
+                <div class="buttondown">
+                    <form method="POST" action="{{ url_for('views.deny') }}">
+                        <button class="badbutton" type="submit">DENY</button>
+                    </form>
+                    <form method="POST">
+                        <button class="goodbutton" type="submit" id="acceptBtn" disabled>ACCEPT & START</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Access the webcam — camera must work before allowing ACCEPT
+        async function startVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+                const videoElement = document.getElementById('video');
+                videoElement.srcObject = stream;
+                document.getElementById('cameraStatus').textContent = '✅ Camera active. Click Register below.';
+                document.getElementById('cameraStatus').className = 'camera-status camera-status--ok';
+                document.getElementById('registerFaceBtn').disabled = false;
+                document.getElementById('acceptBtn').disabled = true; // explicitly disabled until face registered
+            } catch (error) {
+                console.error('Error accessing the webcam:', error);
+                document.getElementById('cameraStatus').textContent = '❌ Camera access denied — cannot proceed';
+                document.getElementById('cameraStatus').className = 'camera-status camera-status--error';
+                document.getElementById('registerFaceBtn').disabled = true;
+                document.getElementById('acceptBtn').disabled = true;
+            }
+        }
+
+        async function registerFace() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('snapshotCanvas');
+            const registerBtn = document.getElementById('registerFaceBtn');
+            const acceptBtn = document.getElementById('acceptBtn');
+            const statusText = document.getElementById('cameraStatus');
+
+            // Set up context and draw current frame (downsampled for low memory usage)
+            const ctx = canvas.getContext('2d');
+            canvas.width = 480;
+            canvas.height = 360;
+            
+            ctx.drawImage(video, 0, 0, 480, 360);
+            
+            // Convert to lightweight base64 JPEG
+            const base64Image = canvas.toDataURL('image/jpeg', 0.70).split(',')[1];
+
+            // Disable buttons and show processing state
+            registerBtn.disabled = true;
+            registerBtn.textContent = '🔄 Registering...';
+            statusText.textContent = '🔄 Analyzing and registering face, please hold still...';
+            statusText.className = 'camera-status camera-status--ok';
+
+            try {
+                const response = await fetch('/recognition/api/register_temp_face', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_data: base64Image })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Registration success
+                    statusText.textContent = '✅ Face Registered & Verified Successfully!';
+                    statusText.className = 'camera-status camera-status--ok';
+                    
+                    registerBtn.textContent = '✅ Face Registered';
+                    registerBtn.style.background = 'linear-gradient(135deg, var(--color-success) 0%, var(--color-success-hover) 100%)';
+                    registerBtn.disabled = true; // permanently lock after successful registration
+                    
+                    acceptBtn.disabled = false;
+                } else {
+                    // Registration failed
+                    statusText.textContent = '❌ ' + data.message;
+                    statusText.className = 'camera-status camera-status--error';
+                    registerBtn.disabled = false;
+                    registerBtn.textContent = 'Verify & Register Face';
+                    acceptBtn.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error during face registration:', error);
+                statusText.textContent = '❌ Connection error occurred. Please try again.';
+                statusText.className = 'camera-status camera-status--error';
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Verify & Register Face';
+                acceptBtn.disabled = true;
+            }
+        }
+
+        window.onload = function() {
+            startVideo();
+        };
+    </script>
+</body>
+</html>

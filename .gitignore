@@ -1,0 +1,23 @@
+
+*.h
+/.venv
+/Lib
+/Scripts
+pyvenv.cfg
+.env
+venv/
+__pycache__/
+*.pyc
+
+PROJECT_INTERNALS.md
+CLAUDE.md
+DEPLOYMENT.md
+
+# Throwaway test scripts — never commit credentials
+test.py
+
+*md
+!README.md
+
+.env
+.env.example

@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttentionGuard - Exam</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <!-- MediaPipe Face Mesh for client-side gaze/head/eye tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+<body class="questionpage" oncontextmenu="return false" id="testBody" data-questions="{{ question_dict }}" data-regno="{{ regno }}">
+    <video id="video" width="320" height="240" style="display:none" autoplay></video>
+    <canvas id="proctorCanvas" width="320" height="240" style="display:none"></canvas>
+ 
+    <!-- Proctoring Status Bar -->
+    <div id="proctorBar" class="proctor-bar">
+        <div class="proctor-status">
+            <span id="proctorDot" class="proctor-dot proctor-dot--active"></span>
+            <span id="proctorLabel">Proctoring Active</span>
+        </div>
+        <div class="proctor-violations">
+            <span>Warnings: <strong id="violationCount">0</strong> / <span id="maxViolations">6</span></span>
+        </div>
+    </div>
+
+    <!-- Violation Warning Popup -->
+    <div class="proctor-popup" id="vioPopup">
+        <div class="proctor-popup-icon">⚠️</div>
+        <p id="vioMessage">Suspicious activity detected.</p>
+    </div>
+
+    <!-- Severe Warning Popup -->
+    <div class="proctor-popup proctor-popup--severe" id="severePopup">
+        <div class="proctor-popup-icon">🚫</div>
+        <p id="severeMessage">FINAL WARNING: One more violation will result in disqualification.</p>
+    </div>
+
+    <!-- Unanswered Questions Popup -->
+    <div class="proctor-popup proctor-popup--info" id="emptyPopup">
+        <p>Please answer all the questions before submitting.</p>
+    </div>
+
+    <!-- Fullscreen Request Overlay -->
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+        <div class="fullscreen-overlay-content">
+            <h2>⚠️ Fullscreen Required</h2>
+            <p>The exam must be taken in fullscreen mode. Please click the button below to continue.</p>
+            <button id="fullscreenBtn" class="fullscreen-btn" onclick="requestFullscreen()">Enter Fullscreen</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <header class="brand">
+                <img class="logoq" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo">
+                <h1 class="AttentionGuardq">Attention<span class="gold-text">Guard</span></h1>
+            </header>
+            <div class="timer">
+                <img class="timerimg" src="{{ url_for('static', filename='images/timer.png') }}" alt="image of a timer" width="40"/>
+                <span id="timer">  00:15:00</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="sidebar">
+                <div id="output" class="proctor-webcam-status"></div>
+                <div class="questions">
+                    <h3 class="qn"><u>Questions:</u></h3>
+                    <ul id="questionList">
+                    </ul>
+                </div>
+            </div>
+            <form id="mainquestion" action="{{ url_for('views.test', code=code) }}" method="POST">
+                <input type="hidden" name="time_taken" id="timeTakenInput" value="0">
+                <div id="mother">
+                </div>
+                <div class="navigation">
+                    <button type="button" class="buttonquestion" id="prev" style="display:none" onclick="switchQuestion(activeN-1)">PREVIOUS</button>
+                    <button type="button" class="buttonquestion" id="next" onclick="switchQuestion(activeN+1)">NEXT</button>
+                    <input type="submit" id="submitButt" style="display:none" value="SUBMIT"/>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        // PROCTORING ENGINE — AttentionGuard
+        // ================================================================
+        // Dual-layer proctoring:
+        //   Layer 1: Client-side MediaPipe Face Mesh (real-time, 30fps)
+        //            → Head pose, eye gaze, face presence, blink detection
+        //   Layer 2: Server-side InsightFace via WebSocket (every 3s)
+        //            → Face identity verification (is this the right person?)
+        // ================================================================
+
+        const EXAM_DURATION_MINUTES = Number("{{ duration_minutes }}") || 15;
+        const WARNING_THRESHOLD = 3;   // Show severe warning
+        const BAN_THRESHOLD = 6;       // Auto-submit + ban
+        const FACE_CHECK_INTERVAL = 3000; // Server-side face check interval (ms)
+
+        // Violation tracking
+        let violations = 0;
+        let violationLog = [];
+        const regno = document.getElementById("testBody").dataset.regno;
+        let lastViolationTime = 0;
+        const VIOLATION_COOLDOWN_MS = 6000; // 6 seconds minimum between warnings
+
+        // Grace period flag: suppress tab_switch violations during
+        // fullscreen transitions and form submission, which both cause
+        // the browser to fire blur/visibilitychange spuriously.
+        let inGracePeriod = false;
+        function startGracePeriod(durationMs) {
+            inGracePeriod = true;
+            setTimeout(() => { inGracePeriod = false; }, durationMs || 2000);
+        }
+
+        // MediaPipe state tracking
+        let lastFaceDetectedTime = Date.now();
+        let noFaceWarningActive = false;
+        let multipleFacesWarningActive = false;
+        let lookAwayStartTime = null;
+        let lookAwayWarningActive = false;
+        let blinkCount = 0;
+        let lastBlinkTime = 0;
+        let rapidBlinkWarningActive = false;
+        let lastEAR = 1.0; // Eye Aspect Ratio
+        let eyesClosed = false;
+        let eyesClosedStartTime = null;
+        let faceMeshReady = false;
+        let isExamActive = true;
+
+        // ----------------------------------------------------------------
+        // Violation System
+        // ----------------------------------------------------------------
+        function addViolation(type, message) {
+            if (!isExamActive) return;
+
+            const now = Date.now();
+            if (now - lastViolationTime < VIOLATION_COOLDOWN_MS) {
+                console.log(`Violation of type '${type}' throttled: ${message}`);
+                return;
+            }
+            lastViolationTime = now;
+
+            violations++;
+            violationLog.push({
+                type: type,
+                message: message,
+                timestamp: new Date().toISOString(),
+                count: violations
+            });
+
+            // Update UI
+            document.getElementById('violationCount').textContent = violations;
+
+            // Log to server
+            logViolationToServer(type, message);
+
+            if (violations >= BAN_THRESHOLD) {
+                disqualify(type);
+                return;
+            }
+
+            if (violations >= WARNING_THRESHOLD) {
+                showSevereWarning(message);
+                // Update proctor bar to danger state
+                document.getElementById('proctorDot').className = 'proctor-dot proctor-dot--danger';
+                document.getElementById('proctorLabel').textContent = 'FINAL WARNING';
+            } else {
+                showWarning(message);
+                // Update proctor bar to warning state
+                document.getElementById('proctorDot').className = 'proctor-dot proctor-dot--warning';
+                document.getElementById('proctorLabel').textContent = 'Warning Issued';
+                setTimeout(() => {
+                    if (violations < WARNING_THRESHOLD) {
+                        document.getElementById('proctorDot').className = 'proctor-dot proctor-dot--active';
+                        document.getElementById('proctorLabel').textContent = 'Proctoring Active';
+                    }
+                }, 5000);
+            }
+        }
+
+        function showWarning(message) {
+            const popup = document.getElementById('vioPopup');
+            document.getElementById('vioMessage').textContent = message;
+            popup.classList.add('proctor-popup--show');
+            setTimeout(() => { popup.classList.remove('proctor-popup--show'); }, 4000);
+        }
+
+        function showSevereWarning(message) {
+            const popup = document.getElementById('severePopup');
+            document.getElementById('severeMessage').textContent = '⚠️ ' + message + ' — Next violation = DISQUALIFICATION';
+            popup.classList.add('proctor-popup--show');
+            setTimeout(() => { popup.classList.remove('proctor-popup--show'); }, 5000);
+        }
+
+        function disqualify(reason) {
+            isExamActive = false;
+            alert('You have been disqualified for: ' + reason + '\nTotal violations: ' + violations);
+            window.location.replace('/ban/' + regno);
+        }
+
+        function logViolationToServer(type, message) {
+            fetch('/api/violation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: type,
+                    message: message,
+                    violation_number: violations,
+                    timestamp: new Date().toISOString()
+                })
+            }).catch(err => console.error('Failed to log violation:', err));
+        }
+
+        // ----------------------------------------------------------------
+        // History manipulation (prevent back button)
+        // ----------------------------------------------------------------
+        history.pushState(null, null, location.href);
+        window.addEventListener('popstate', function(event) {
+            window.location.href = "{{ url_for('auth.logout') }}";
+        });
+
+        // ----------------------------------------------------------------
+        // Timer with auto-submit
+        // ----------------------------------------------------------------
+        let timerEl = document.getElementById('timer');
+        let timeRemaining = EXAM_DURATION_MINUTES * 60;
+        const timeTakenInput = document.getElementById('timeTakenInput');
+
+        const timerInterval = setInterval(() => {
+            let minutes = Math.floor(timeRemaining / 60);
+            let seconds = timeRemaining % 60;
+            timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            // Track time taken
+            let secondsElapsed = (EXAM_DURATION_MINUTES * 60) - timeRemaining;
+            if (timeTakenInput) {
+                timeTakenInput.value = secondsElapsed;
+            }
+
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                isExamActive = false;
+                if (timeTakenInput) {
+                    timeTakenInput.value = EXAM_DURATION_MINUTES * 60;
+                }
+                alert('Time is up! Your exam will be submitted automatically.');
+                document.getElementById('mainquestion').submit();
+                return;
+            }
+
+            // Flash timer when < 1 minute
+            if (timeRemaining <= 60) {
+                timerEl.parentElement.classList.add('timer--urgent');
+            }
+
+            timeRemaining--;
+        }, 1000);
+
+        // ----------------------------------------------------------------
+        // Fullscreen Enforcement — NUCLEAR DOM-REMOVAL APPROACH
+        // Instead of just hiding the overlay (which Chromium's GPU
+        // compositor can ignore), we physically remove it from the DOM
+        // tree so no phantom compositing layer can intercept events.
+        // ----------------------------------------------------------------
+        let savedOverlayHTML = '';
+        let enforcerInterval = null;
+
+        function nukeOverlay() {
+            const overlay = document.getElementById('fullscreenOverlay');
+            if (overlay) {
+                if (!savedOverlayHTML) savedOverlayHTML = overlay.outerHTML;
+                overlay.remove();
+                console.log('[FS-FIX] Overlay physically removed from DOM');
+            }
+        }
+
+        function restoreOverlay() {
+            if (!document.getElementById('fullscreenOverlay') && savedOverlayHTML) {
+                document.body.insertAdjacentHTML('afterbegin', savedOverlayHTML);
+                const overlay = document.getElementById('fullscreenOverlay');
+                if (overlay) {
+                    overlay.classList.add('fullscreen-overlay--show');
+                    const btn = document.getElementById('fullscreenBtn');
+                    if (btn) btn.onclick = requestFullscreen;
+                }
+                console.log('[FS-FIX] Overlay restored to DOM');
+            }
+        }
+
+        function startEnforcer() {
+            if (enforcerInterval) return;
+            enforcerInterval = setInterval(() => {
+                if (!isFullscreen()) {
+                    clearInterval(enforcerInterval);
+                    enforcerInterval = null;
+                    return;
+                }
+                // Continuously ensure overlay stays removed
+                const overlay = document.getElementById('fullscreenOverlay');
+                if (overlay) {
+                    if (!savedOverlayHTML) savedOverlayHTML = overlay.outerHTML;
+                    overlay.remove();
+                }
+                // Only disable pointer-events on the fullscreen overlay itself.
+                // Do NOT touch other divs — that breaks MediaPipe Camera,
+                // which needs the hidden <video> element to remain functional.
+            }, 1000);
+        }
+
+        function requestFullscreen() {
+            // Start grace period BEFORE requesting fullscreen so the
+            // blur / visibilitychange events it fires are ignored.
+            startGracePeriod(3000);
+
+            const elem = document.documentElement;
+            let fsPromise = null;
+            
+            try {
+                if (elem.requestFullscreen) {
+                    fsPromise = elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    fsPromise = elem.webkitRequestFullscreen();
+                } else if (elem.mozRequestFullScreen) {
+                    fsPromise = elem.mozRequestFullScreen();
+                } else if (elem.msRequestFullscreen) {
+                    fsPromise = elem.msRequestFullscreen();
+                }
+            } catch (err) {
+                console.error("Fullscreen error:", err);
+            }
+            
+            // NUCLEAR: Remove overlay from DOM entirely
+            nukeOverlay();
+            startEnforcer();
+
+            // Handle fullscreen failure
+            if (fsPromise && typeof fsPromise.catch === 'function') {
+                fsPromise.catch((err) => {
+                    console.warn("Fullscreen request rejected:", err);
+                    inGracePeriod = false;
+                    if (enforcerInterval) { clearInterval(enforcerInterval); enforcerInterval = null; }
+                    restoreOverlay();
+                });
+            }
+
+            setTimeout(() => { window.focus(); }, 100);
+        }
+
+        function isFullscreen() {
+            // 1. Standard Native check
+            const isNative = !!(
+                document.fullscreenElement || 
+                document.webkitFullscreenElement || 
+                document.mozFullScreenElement || 
+                document.msFullscreenElement ||
+                document.webkitIsFullScreen ||
+                document.mozFullScreen ||
+                document.msFullscreen
+            );
+            
+            // 2. Media Query check (extremely reliable for both F11 and JS fullscreen under zoom)
+            const isMediaQuery = window.matchMedia('(display-mode: fullscreen)').matches;
+            
+            // 3. Zoom-safe viewport height vs window outer height check.
+            // In windowed mode, tabs + address bar + bookmark bar take at least 60px of vertical space.
+            // In fullscreen mode (native or F11), browser chrome is hidden, so inner height matches outer height.
+            const isViewportFS = Math.abs(window.innerHeight - window.outerHeight) < 25;
+            
+            // 4. Zoom-safe screen dimensions matching outer window dimensions.
+            // In fullscreen mode, the browser window must cover the entire monitor area.
+            const screenW = window.screen.width;
+            const screenH = window.screen.height;
+            const isScreenFS = (Math.abs(window.outerWidth - screenW) < 25 && 
+                                Math.abs(window.outerHeight - screenH) < 25);
+            
+            // 5. Ratio fallback check (for complex Multi-monitor or Virtual Desktop scaling)
+            const ratioH = window.innerHeight / screenH;
+            const ratioW = window.innerWidth / screenW;
+            const isRatioFS = ratioW > 0.90 && ratioH > 0.90;
+                                      
+            return isNative || isMediaQuery || (isViewportFS && isScreenFS) || isRatioFS;
+        }
+
+        function onFullscreenChange() {
+            console.log('[FS-FIX] fullscreenchange event fired');
+            
+            const checkIntervals = [50, 200, 500, 1000];
+            checkIntervals.forEach((delay) => {
+                setTimeout(() => {
+                    const isFS = isFullscreen();
+                    console.log(`[FS-FIX] Check at ${delay}ms: isFullscreen=${isFS}`);
+                    if (isFS) {
+                        nukeOverlay();
+                        startEnforcer();
+                        window.focus();
+                    } else if (!isFS && isExamActive && delay === 1000) {
+                        // Confirmed exit after full settle window
+                        if (enforcerInterval) { clearInterval(enforcerInterval); enforcerInterval = null; }
+                        restoreOverlay();
+                        addViolation('fullscreen_exit', 'Exited fullscreen mode');
+                    }
+                }, delay);
+            });
+        }
+
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+        document.addEventListener('mozfullscreenchange', onFullscreenChange);
+        document.addEventListener('msfullscreenchange', onFullscreenChange);
+
+        // Check/enforce fullscreen on page load
+        setTimeout(() => {
+            if (!isFullscreen()) {
+                const overlay = document.getElementById('fullscreenOverlay');
+                if (overlay) overlay.classList.add('fullscreen-overlay--show');
+            } else {
+                nukeOverlay();
+                startEnforcer();
+            }
+        }, 300);
+
+        // ----------------------------------------------------------------
+        // Server-side face recognition via WebSocket
+        // ----------------------------------------------------------------
+        const socket = io();
+
+        socket.on('response', (data) => {
+            if (!isExamActive) return;
+
+            const outputEl = document.getElementById('output');
+
+            if (data.name && data.confidence) {
+                const confidence = parseFloat(data.confidence);
+
+                if (data.face_count && data.face_count > 1) {
+                    outputEl.innerHTML = '<span class="webcam-alert">⚠️ Multiple faces detected!</span>';
+                    addViolation('multiple_faces', 'Multiple faces detected in webcam');
+                } else if (confidence < 0.25) {
+                    outputEl.innerHTML = '<span class="webcam-alert">⚠️ Face not recognized</span>';
+                    addViolation('face_mismatch', 'Face does not match registered user (low confidence)');
+                } else {
+                    outputEl.innerHTML = `<span class="webcam-ok">✓ Verified: ${data.name}</span>`;
+                }
+            } else {
+                // No face detected by server
+                outputEl.innerHTML = '<span class="webcam-warn">📷 No face detected</span>';
+            }
+        });
+
+        // ----------------------------------------------------------------
+        // Webcam + MediaPipe Face Mesh (client-side proctoring)
+        // ----------------------------------------------------------------
+        let webcamStream = null;
+
+        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
+            .then((stream) => {
+                webcamStream = stream;
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+
+                // Start server-side face identity check every 3 seconds
+                const sendFrame = () => {
+                    if (!isExamActive) return;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const frame = canvas.toDataURL('image/jpeg', 0.7);
+                    socket.emit('video_frame', frame.split(',')[1]);
+                    setTimeout(sendFrame, FACE_CHECK_INTERVAL);
+                };
+                video.onloadeddata = () => { sendFrame(); };
+
+                // Initialize MediaPipe Face Mesh
+                initFaceMesh(video);
+            })
+            .catch((error) => {
+                console.error("Error accessing webcam:", error);
+                document.getElementById('output').innerHTML = '<span class="webcam-alert">❌ Camera access denied</span>';
+                addViolation('camera_denied', 'Webcam access was denied');
+            });
+
+        function initFaceMesh(videoElement) {
+            try {
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                    }
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 2,           // Detect up to 2 faces
+                    refineLandmarks: true,     // Enable iris tracking
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults(onFaceMeshResults);
+
+                let lastFaceMeshTime = 0;
+                const FACEMESH_INTERVAL_MS = 300; // Check head/gaze pose every 300ms (approx 3.3fps) instead of 30fps
+
+                // Use MediaPipe Camera utility for continuous processing
+                const camera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        if (isExamActive) {
+                            const now = Date.now();
+                            if (now - lastFaceMeshTime >= FACEMESH_INTERVAL_MS) {
+                                lastFaceMeshTime = now;
+                                await faceMesh.send({ image: videoElement });
+                            }
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+                camera.start();
+                faceMeshReady = true;
+                console.log('MediaPipe Face Mesh initialized successfully');
+            } catch (err) {
+                console.warn('MediaPipe Face Mesh not available, falling back to server-only proctoring:', err);
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // Face Mesh Results Processing
+        // ----------------------------------------------------------------
+        function onFaceMeshResults(results) {
+            if (!isExamActive) return;
+
+            const now = Date.now();
+
+            // Check face count
+            if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                // No face detected
+                if (!noFaceWarningActive && (now - lastFaceDetectedTime > 3000)) {
+                    noFaceWarningActive = true;
+                    addViolation('face_missing', 'No face detected — ensure your face is visible');
+                    setTimeout(() => { noFaceWarningActive = false; }, 8000);
+                }
+            } else {
+                lastFaceDetectedTime = now;
+                noFaceWarningActive = false;
+
+                // Multiple faces check
+                if (results.multiFaceLandmarks.length > 1) {
+                    if (!multipleFacesWarningActive) {
+                        multipleFacesWarningActive = true;
+                        addViolation('multiple_faces', 'Multiple faces detected in webcam');
+                        setTimeout(() => { multipleFacesWarningActive = false; }, 8000);
+                    }
+                }
+
+                // Analyze primary face
+                const landmarks = results.multiFaceLandmarks[0];
+                analyzeFaceLandmarks(landmarks, now);
+            }
+        }
+
+        function analyzeFaceLandmarks(landmarks, now) {
+            // Head Pose Estimation (yaw detection using nose and face edges)
+            analyzeHeadPose(landmarks, now);
+
+            // Eye Aspect Ratio for blink/eye closure detection
+            analyzeEyeState(landmarks, now);
+
+            // Gaze direction from iris landmarks
+            analyzeGazeDirection(landmarks, now);
+        }
+
+        // ----------------------------------------------------------------
+        // Head Pose Analysis
+        // ----------------------------------------------------------------
+        function analyzeHeadPose(landmarks, now) {
+            // Use nose tip (1), left cheek (234), right cheek (454)
+            const noseTip = landmarks[1];
+            const leftCheek = landmarks[234];
+            const rightCheek = landmarks[454];
+            const chin = landmarks[152];
+            const forehead = landmarks[10];
+
+            // Horizontal: calculate if head is turned left/right
+            const faceWidth = Math.abs(rightCheek.x - leftCheek.x);
+            const noseCenterOffset = (noseTip.x - leftCheek.x) / faceWidth;
+
+            // Vertical: looking up/down
+            const faceHeight = Math.abs(forehead.y - chin.y);
+            const noseVerticalOffset = (noseTip.y - forehead.y) / faceHeight;
+
+            // If nose is significantly off-center horizontally → looking away
+            const isLookingAway = noseCenterOffset < 0.3 || noseCenterOffset > 0.7;
+            // If looking too far up or down
+            const isLookingUpDown = noseVerticalOffset < 0.25 || noseVerticalOffset > 0.75;
+
+            if (isLookingAway || isLookingUpDown) {
+                if (!lookAwayStartTime) {
+                    lookAwayStartTime = now;
+                } else if (now - lookAwayStartTime > 2000 && !lookAwayWarningActive) {
+                    lookAwayWarningActive = true;
+                    addViolation('looking_away', 'Looking away from screen detected');
+                    setTimeout(() => {
+                        lookAwayWarningActive = false;
+                        lookAwayStartTime = null;
+                    }, 8000);
+                }
+            } else {
+                lookAwayStartTime = null;
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // Eye State Analysis (EAR — Eye Aspect Ratio)
+        // ----------------------------------------------------------------
+        function analyzeEyeState(landmarks, now) {
+            // Right eye landmarks: 33, 160, 158, 133, 153, 144
+            // Left eye landmarks:  362, 385, 387, 263, 373, 380
+            const rightEAR = calculateEAR(
+                landmarks[33], landmarks[160], landmarks[158],
+                landmarks[133], landmarks[153], landmarks[144]
+            );
+            const leftEAR = calculateEAR(
+                landmarks[362], landmarks[385], landmarks[387],
+                landmarks[263], landmarks[373], landmarks[380]
+            );
+            const avgEAR = (rightEAR + leftEAR) / 2;
+
+            // Detect eyes closed for too long (> 3 seconds)
+            if (avgEAR < 0.18) {
+                if (!eyesClosed) {
+                    eyesClosed = true;
+                    eyesClosedStartTime = now;
+                } else if (now - eyesClosedStartTime > 3000) {
+                    addViolation('eyes_closed', 'Eyes closed for extended period — possible reading from another device');
+                    eyesClosed = false;
+                    eyesClosedStartTime = null;
+                }
+            } else {
+                // Detect blink
+                if (eyesClosed && avgEAR >= 0.18) {
+                    blinkCount++;
+                    // Detect rapid blinking (> 8 blinks in 5 seconds)
+                    if (now - lastBlinkTime < 5000 && blinkCount > 8 && !rapidBlinkWarningActive) {
+                        rapidBlinkWarningActive = true;
+                        addViolation('rapid_blinking', 'Excessive rapid blinking detected');
+                        setTimeout(() => {
+                            rapidBlinkWarningActive = false;
+                            blinkCount = 0;
+                        }, 10000);
+                    }
+                    if (now - lastBlinkTime >= 5000) {
+                        blinkCount = 1;
+                        lastBlinkTime = now;
+                    }
+                }
+                eyesClosed = false;
+                eyesClosedStartTime = null;
+            }
+
+            lastEAR = avgEAR;
+        }
+
+        function calculateEAR(p1, p2, p3, p4, p5, p6) {
+            // EAR = (|p2-p6| + |p3-p5|) / (2 * |p1-p4|)
+            const d1 = Math.sqrt(Math.pow(p2.x - p6.x, 2) + Math.pow(p2.y - p6.y, 2));
+            const d2 = Math.sqrt(Math.pow(p3.x - p5.x, 2) + Math.pow(p3.y - p5.y, 2));
+            const d3 = Math.sqrt(Math.pow(p1.x - p4.x, 2) + Math.pow(p1.y - p4.y, 2));
+            if (d3 === 0) return 0;
+            return (d1 + d2) / (2.0 * d3);
+        }
+
+        // ----------------------------------------------------------------
+        // Gaze Direction Analysis (using iris landmarks)
+        // ----------------------------------------------------------------
+        function analyzeGazeDirection(landmarks, now) {
+            // Left iris center: 468, Right iris center: 473
+            // (only available with refineLandmarks: true)
+            if (landmarks.length < 474) return;
+
+            const leftIris = landmarks[468];
+            const rightIris = landmarks[473];
+            const leftEyeInner = landmarks[133];
+            const leftEyeOuter = landmarks[33];
+            const rightEyeInner = landmarks[362];
+            const rightEyeOuter = landmarks[263];
+
+            // Calculate relative iris position within eye (0 = left edge, 1 = right edge)
+            const leftEyeWidth = Math.abs(leftEyeOuter.x - leftEyeInner.x);
+            const rightEyeWidth = Math.abs(rightEyeInner.x - rightEyeOuter.x);
+
+            if (leftEyeWidth === 0 || rightEyeWidth === 0) return;
+
+            const leftGaze = (leftIris.x - leftEyeOuter.x) / leftEyeWidth;
+            const rightGaze = (rightIris.x - rightEyeOuter.x) / rightEyeWidth;
+            const avgGaze = (leftGaze + rightGaze) / 2;
+
+            // Eyes looking too far left or right (normal range: ~0.3 - 0.7)
+            if ((avgGaze < 0.2 || avgGaze > 0.8) && !lookAwayWarningActive) {
+                if (!lookAwayStartTime) {
+                    lookAwayStartTime = now;
+                } else if (now - lookAwayStartTime > 2500) {
+                    lookAwayWarningActive = true;
+                    addViolation('gaze_away', 'Eyes looking away from screen');
+                    setTimeout(() => {
+                        lookAwayWarningActive = false;
+                        lookAwayStartTime = null;
+                    }, 8000);
+                }
+            }
+        }
+
+    </script>
+
+    <!-- Question navigation and anti-cheat keyboard/tab-switch handlers -->
+    {% include "questionPageScript.html" %}
+</body>
+</html>

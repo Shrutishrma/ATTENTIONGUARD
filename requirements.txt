@@ -1,0 +1,26 @@
+# ================================================================
+# AttentionGuard — Core Dependencies
+# ================================================================
+
+# --- Web & API Framework ---
+Flask>=3.0.0
+Flask-Cors>=4.0.0
+Flask-PyMongo>=2.3.0
+Flask-SocketIO>=5.3.6
+simple-websocket>=1.0.0
+python-dotenv>=1.0.1
+pymongo>=4.8.0
+dnspython>=2.6.0
+
+# --- Computer Vision & Machine Learning ---
+insightface>=0.7.3
+onnx<1.17.0
+onnxruntime>=1.18.0
+opencv-python-headless>=4.10.0
+scikit-learn>=1.5.0
+numpy>=1.26.0,<2.0.0
+Pillow>=10.4.0
+
+# --- Document Parsing & Exam Ingestion ---
+pdfplumber>=0.11.4
+python-docx>=1.1.2

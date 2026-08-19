@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttentionGuard — Upload Questions</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="teacher-body">
+
+    <header class="teacher-header">
+        <div class="teacher-header-left">
+            <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuard Logo">
+            <span class="AttentionGuard" style="font-size:1.2em;">Attention<span class="gold-text">Guard</span></span>
+        </div>
+        <div class="teacher-header-right">
+            <a href="/teacher" class="header-back-btn">← Dashboard</a>
+            <a href="/logout" class="header-logout-btn">Logout</a>
+        </div>
+    </header>
+
+    <div class="teacher-container">
+
+        {% with messages = get_flashed_messages(with_categories=True) %}
+          {% if messages %}
+            <div class="flashes" style="margin-bottom:18px;">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                  {{ message }}
+                  <button class="close-btn" onclick="this.parentElement.style.display='none';">&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div class="upload-layout">
+
+            <!-- Left: upload form -->
+            <div class="upload-card">
+                <h2 class="upload-title">Create Question Set</h2>
+                <form action="" method="post" enctype="multipart/form-data" class="upload-form">
+
+                    <label class="field-label">Question Set Title</label>
+                    <input class="upload-input" type="text" name="title"
+                           placeholder="e.g. Mid-Term Physics Quiz" required>
+
+                    <label class="field-label" style="margin-top:18px;">
+                        Question File
+                        <span class="field-hint">PDF · DOCX · TXT · CSV</span>
+                    </label>
+                    <div class="file-drop-area">
+                        <input type="file" name="file" id="fileInput"
+                               accept=".pdf,.docx,.txt,.csv" required
+                               onchange="document.getElementById('file-name').textContent = this.files[0]?.name || 'No file chosen'">
+                        <label for="fileInput" class="file-drop-label">
+                            <span class="file-icon">📄</span>
+                            <span>Click to select file</span>
+                            <span id="file-name" class="file-name-display">No file chosen</span>
+                        </label>
+                    </div>
+
+                    <label class="field-label" style="margin-top:18px;">
+                        Exam Duration
+                        <span class="field-hint">Minutes (1 - 180)</span>
+                    </label>
+                    <input class="upload-input" type="number" name="duration_minutes"
+                           value="15" min="1" max="180" required>
+
+                    <div style="margin-top:20px; margin-bottom: 20px; display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" name="allow_retake" id="allow_retake" style="width:18px; height:18px; cursor:pointer; accent-color: var(--color-gold);">
+                        <label for="allow_retake" style="font-family: var(--font-body); font-size:14px; color: var(--text-secondary); cursor:pointer; user-select:none;">
+                            Allow Multiple Attempts (Retakes)
+                        </label>
+                    </div>
+
+                    <button type="submit" class="upload-submit-btn">Upload &amp; Generate Code</button>
+                </form>
+
+                <p class="upload-note">
+                    A unique 6-character test code is generated automatically.
+                    Share it with students so they can log in and take the exam.
+                </p>
+            </div>
+
+            <!-- Right: format guide -->
+            <div class="format-guide-card">
+                <h3 class="format-guide-title">File Format Guide</h3>
+
+                <div class="format-tabs">
+                    <button class="format-tab active" onclick="showTab('txt')">TXT / DOCX / PDF</button>
+                    <button class="format-tab" onclick="showTab('csv')">CSV</button>
+                </div>
+
+                <div id="tab-txt" class="format-content active">
+                    <p class="format-desc">
+                        Each question must follow this exact structure.
+                        Any question without an <code>Answer:</code> line will cause the upload to fail.
+                    </p>
+                    <pre class="format-example">1. What is the capital of France?
+A) London
+B) Berlin
+C) Paris
+D) Madrid
+Answer: C
+
+2. Which planet is the Red Planet?
+A) Venus
+B) Mars
+C) Jupiter
+D) Saturn
+Answer: B</pre>
+                    <ul class="format-rules">
+                        <li>Questions start with a number followed by <code>.</code> or <code>)</code></li>
+                        <li>Options use <code>A)</code> through <code>D)</code> — exactly 4 per question</li>
+                        <li><code>Answer: X</code> must appear after every question (X = A, B, C, or D)</li>
+                        <li>PDFs must contain selectable text — scanned images won't work</li>
+                    </ul>
+                    <a href="/static/templates/sample_questions.txt" download class="download-link">
+                        Download TXT template
+                    </a>
+                </div>
+
+                <div id="tab-csv" class="format-content" style="display:none;">
+                    <p class="format-desc">
+                        CSV is the most reliable format. Use a spreadsheet app and export as CSV.
+                    </p>
+                    <pre class="format-example">question,option_a,option_b,option_c,option_d,answer
+What is the capital of France?,London,Berlin,Paris,Madrid,Paris
+Which planet is the Red Planet?,Venus,Mars,Jupiter,Saturn,Mars</pre>
+                    <ul class="format-rules">
+                        <li>Header row is required with exactly these column names</li>
+                        <li>The <code>answer</code> column must contain the <em>exact text</em> of the correct option</li>
+                        <li>All 6 columns are required — leaving any empty rejects the upload</li>
+                        <li>Save as UTF-8 CSV (not Excel .xlsx)</li>
+                    </ul>
+                    <a href="/static/templates/sample_questions.csv" download class="download-link">
+                        Download CSV template
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(name) {
+            document.querySelectorAll('.format-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.format-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + name).style.display = 'block';
+            event.target.classList.add('active');
+        }
+    </script>
+
+</body>
+</html>

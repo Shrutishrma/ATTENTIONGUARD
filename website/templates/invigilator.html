@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttentionGuard — Invigilator Dashboard</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="invibody">
+    <header class="teacher-header">
+        <div class="teacher-header-left">
+            <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo"/>
+            <span class="AttentionGuard" style="font-size:1.2em;">Attention<span class="gold-text">Guard</span></span>
+        </div>
+        <div class="teacher-header-right">
+            <a href="/teacher" class="header-back-btn">← Dashboard</a>
+        </div>
+    </header>
+
+    <div class="containerinvi">
+        {% if user_data %}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:15px; width:100%;">
+            <h1 class="testcode" style="margin:0;">TEST CODE: {{ test_code }}</h1>
+            <a href="/invigilator/{{ test_code }}/export" class="create-btn" style="text-decoration:none; display:inline-flex; align-items:center; gap:8px; padding: 10px 18px; font-size:14px; font-weight:700; border-radius:8px;">
+                📥 Export CSV
+            </a>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Reg No.</th>
+                        <th>Status</th>
+                        <th>Ban</th>
+                        <th>Grade</th>
+                        <th>Violations</th>
+                        <th>Violation Types</th>
+                        <th>Time Taken</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in user_data %}
+                    <tr class="{% if user.violation_count >= 6 %}row-danger{% elif user.violation_count >= 3 %}row-warning{% endif %}">
+                        <td>{{ user.reg_no }}</td>
+                        <td>{{ user.status }}</td>
+                        <td class="ban-{{ 'yes-invi' if user.ban == 'yes' else 'no-invi' }}">{{ user.ban }}</td>
+                        <td>{{ user.grade }}</td>
+                        <td class="{% if user.violation_count >= 6 %}violation-critical{% elif user.violation_count >= 3 %}violation-warning{% else %}violation-ok{% endif %}">
+                            {{ user.violation_count }}
+                        </td>
+                        <td class="violation-types">{{ user.violation_types }}</td>
+                        <td>{{ user.time_taken }}</td>
+                        <td>
+                            {% if user.status == 'submitted' %}
+                            <button class="signbutton" onclick="openModal('modal-{{ user.reg_no }}')" style="padding: 6px 12px; font-size:12px; font-weight:600; text-transform:none; border-radius:6px; letter-spacing:0.02em; font-family:var(--font-heading); display:inline-flex; width:auto; height:32px; align-items:center; cursor:pointer;">
+                                Review Choices
+                            </button>
+                            {% else %}
+                            <span style="color:var(--text-muted); font-size:12px;">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state-invi">
+            <h2>No submissions yet</h2>
+            <p>Students who take this test will appear here with their scores and proctoring data.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Candidate Attempt Review Modals -->
+    {% if user_data %}
+        {% for user in user_data %}
+            {% if user.status == 'submitted' %}
+            <div id="modal-{{ user.reg_no }}" class="custom-modal" onclick="if(event.target == this) closeModal('modal-{{ user.reg_no }}')">
+                <div class="custom-modal-content">
+                    <span class="custom-modal-close" onclick="closeModal('modal-{{ user.reg_no }}')">&times;</span>
+                    <h2 class="modal-title">Attempt Review — {{ user.reg_no }}</h2>
+                    <div class="modal-meta" style="margin-bottom: 25px; font-family:var(--font-heading); display:flex; gap:20px; font-size:14px; color:var(--text-secondary); border-bottom: 1px solid var(--border-glass); padding-bottom:12px;">
+                        <span>Time Taken: <strong style="color:var(--color-gold);">{{ user.time_taken }}</strong></span>
+                        <span>Score: <strong style="color:var(--color-gold);">{{ user.grade }}%</strong></span>
+                        <span>Violations: 
+                            {% if user.violation_count >= 3 %}
+                                <strong style="color: var(--color-danger);">{{ user.violation_count }}</strong>
+                            {% else %}
+                                <strong style="color: var(--color-success);">{{ user.violation_count }}</strong>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="modal-review-list" style="display:flex; flex-direction:column; gap:16px; max-height:480px; overflow-y:auto; padding-right:8px;">
+                        {% if user.questions_detail %}
+                            {% for q in user.questions_detail %}
+                                <div class="modal-review-item" style="padding:15px; border-radius:10px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; margin-bottom:10px;">
+                                        <p style="margin:0; font-size:13.5px; font-weight:600; color:var(--text-primary); line-height:1.5;">
+                                            {{ loop.index }}. {{ q.question }}
+                                        </p>
+                                        {% if q.is_correct %}
+                                            <span style="background:rgba(90,140,111,0.12); color:var(--color-success); border:1px solid rgba(90,140,111,0.25); font-size:10px; font-weight:700; padding:2px 8px; border-radius:15px; text-transform:uppercase; flex-shrink:0;">Correct</span>
+                                        {% else %}
+                                            <span style="background:rgba(197,95,95,0.12); color:var(--color-danger); border:1px solid rgba(197,95,95,0.25); font-size:10px; font-weight:700; padding:2px 8px; border-radius:15px; text-transform:uppercase; flex-shrink:0;">Incorrect</span>
+                                        {% endif %}
+                                    </div>
+                                    <div style="font-size:12.5px; display:flex; flex-direction:column; gap:6px;">
+                                        <p style="margin:0; color:var(--text-secondary);">
+                                            <span>Chosen Option:</span> 
+                                            {% if q.is_correct %}
+                                                <strong style="color: var(--color-success);">{{ q.chosen }}</strong>
+                                            {% else %}
+                                                <strong style="color: var(--color-danger);">{{ q.chosen }}</strong>
+                                            {% endif %}
+                                        </p>
+                                        {% if not q.is_correct %}
+                                        <p style="margin:0; color:var(--text-muted);">
+                                            <span>Correct Option:</span> <strong style="color:var(--color-success);">{{ q.correct }}</strong>
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p style="color:var(--text-muted); font-size:13px; text-align:center; margin:20px 0;">No question breakdown available for this attempt.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <script>
+        function openModal(id) {
+            document.getElementById(id).classList.add('custom-modal--show');
+            document.body.style.overflow = 'hidden'; // prevent background scrolling
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('custom-modal--show');
+            document.body.style.overflow = ''; // restore background scrolling
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AttentionGuard - Grade Report</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="badiyadi">
+    <header class="gradelogo">
+        <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo">
+        <span class="AttentionGuard">Attention<span class="gold-text">Guard</span></span>
+    </header>
+    
+    <div class="details">
+      <h1 class="myhead">Exam Grade Report</h1>
+      
+      <div class="info-list">
+        <p><span>Register Number</span> <strong>{{regno}}</strong></p>
+        <p><span>Test Code</span> <strong>{{code}}</strong></p>
+        <p><span>Status</span> 
+          {% if score >= 30 %}
+            <strong style="color: var(--color-success); background: var(--color-success-glow); padding: 2px 8px; border-radius: 4px;">PASSED</strong>
+          {% else %}
+            <strong style="color: var(--color-danger); background: var(--color-danger-glow); padding: 2px 8px; border-radius: 4px;">FAILED</strong>
+          {% endif %}
+        </p>
+      </div>
+
+      <section class="marks">
+        <div class="results">
+          {% if score >= 30 %}
+            <p class="percent pass">{{score}}%</p>
+          {% else %}
+            <p class="percent fail">{{score}}%</p>
+          {% endif %}
+          <p class="criteria">Passing threshold: 30%</p>
+        </div>
+        <div class="total">
+          <p class="oneMark">{{correct_answers}} / {{noQ}}</p>
+          <p class="twoMark">Correct Answers</p>
+        </div>
+        <div class="total">
+          <p class="oneMark">{{time_taken}}</p>
+          <p class="twoMark">Time Taken</p>
+        </div>
+      </section>
+
+      {% if questions_detail %}
+      <div class="review-section" style="margin-top: 40px; text-align: left; width: 100%;">
+        <h2 class="review-title" style="font-family: var(--font-heading); color: var(--color-gold); font-size: 18px; font-weight: 700; margin-bottom: 20px; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
+          Detailed Exam Review
+        </h2>
+        <div class="review-list" style="display: flex; flex-direction: column; gap: 16px;">
+          {% for q in questions_detail %}
+          <div class="review-item {% if q.is_correct %}review-item--correct{% else %}review-item--incorrect{% endif %}" 
+               style="padding: 18px; border-radius: 12px; background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-glass); transition: var(--transition-smooth);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 12px;">
+              <h4 style="margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text-primary); line-height: 1.5;">
+                {{ loop.index }}. {{ q.question }}
+              </h4>
+              {% if q.is_correct %}
+                <span class="review-badge" style="background: rgba(90, 140, 111, 0.15); color: var(--color-success); border: 1px solid rgba(90, 140, 111, 0.3); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;">Correct</span>
+              {% else %}
+                <span class="review-badge" style="background: rgba(197, 95, 95, 0.15); color: var(--color-danger); border: 1px solid rgba(197, 95, 95, 0.3); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;">Incorrect</span>
+              {% endif %}
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-family: var(--font-body);">
+              <p style="margin: 0; color: var(--text-secondary);">
+                <span>Your Answer:</span> 
+                {% if q.is_correct %}
+                  <strong style="color: var(--color-success);">{{ q.chosen }}</strong>
+                {% else %}
+                  <strong style="color: var(--color-danger);">{{ q.chosen }}</strong>
+                {% endif %}
+              </p>
+              {% if not q.is_correct %}
+              <p style="margin: 0; color: var(--text-muted);">
+                <span>Correct Answer:</span> <strong style="color: var(--color-success);">{{ q.correct }}</strong>
+              </p>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="action-row" style="margin-top: 35px;">
+        <a href="/logout" class="signbutton" style="text-decoration: none; display: block; width: 100%; box-sizing: border-box; text-align: center;">Finish &amp; Logout</a>
+      </div>
+    </div>
+
+    <script>
+      // Manipulate history to detect back button
+      history.pushState(null, null, location.href);
+      window.addEventListener('popstate', function(event) {
+          window.location.href = "{{ url_for('auth.logout') }}";
+      });
+    </script>
+</body>
+</html>

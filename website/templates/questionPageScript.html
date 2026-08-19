@@ -1,0 +1,192 @@
+<script id="qs">
+    // ================================================================
+    // QUESTION NAVIGATION + ANTI-CHEAT (Tab switch, keyboard shortcuts)
+    // ================================================================
+    window.history.pushState(null, "/logout", window.location.href);
+    window.onpopstate = function(){
+        window.history.pushState(null, "/logout", window.location.href);
+    };
+
+    // Parse question data from the page
+    set = JSON.parse((document.getElementById("testBody").dataset.questions).replaceAll("'", "\""));
+    vioPopup = document.getElementById("vioPopup");
+
+    // ----------------------------------------------------------------
+    // Keyboard shortcut blocking (DevTools, Ctrl+C, etc.)
+    // ----------------------------------------------------------------
+    document.addEventListener('keydown', function(event) {
+        // Block: Ctrl+Shift+I/J/C (DevTools), F12, Ctrl+U (View Source),
+        //        Ctrl+S (Save), Ctrl+P (Print), Ctrl+A (Select All)
+        const blocked =
+            (event.ctrlKey && event.shiftKey && /^[ijc]$/i.test(event.key)) ||
+            (event.key === 'F12') ||
+            (event.ctrlKey && /^[uspa]$/i.test(event.key)) ||
+            (event.key === 'PrintScreen');
+
+        if (blocked) {
+            event.preventDefault();
+            event.stopPropagation();
+            addViolation('keyboard_shortcut', 'Blocked keyboard shortcut: ' + event.key);
+        }
+    });
+
+    // Block right-click (already blocked on body, this is defense-in-depth)
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+        addViolation('right_click', 'Right-click attempt detected');
+    });
+
+    // ----------------------------------------------------------------
+    // Tab switch / window blur detection
+    // ----------------------------------------------------------------
+    window.onblur = function() {
+        if (!isExamActive || inGracePeriod) return;
+        addViolation('tab_switch', 'Switched away from exam window');
+    };
+
+    // Also detect visibility change (more reliable than blur)
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && isExamActive && !inGracePeriod) {
+            addViolation('tab_switch', 'Exam tab became hidden');
+        }
+    });
+
+    // ----------------------------------------------------------------
+    // Question Navigation (unchanged logic, cleaned up)
+    // ----------------------------------------------------------------
+    const listy = document.getElementById("questionList");
+    const mother = document.getElementById("mother");
+    let count = 1;
+    var activeQ = null;
+    var activeN = 1;
+
+    switchQuestion = function(qNo) {
+        const prevButt = document.getElementById("prev");
+        const nextButt = document.getElementById("next");
+        const submitButt = document.getElementById("submitButt");
+        const totalQuestions = Object.keys(set).length;
+
+        if (qNo <= totalQuestions && qNo >= 1) {
+            const q = document.getElementById("q" + qNo);
+            const qBody = document.querySelector("#q" + activeN + " p").innerHTML;
+
+            const oldQButt = document.getElementById("s" + activeN);
+            oldQButt.classList.remove("active");
+            const qButt = document.getElementById("s" + qNo);
+            qButt.classList.add("active");
+            activeQ.style.display = "none";
+            q.style.display = "block";
+
+            if (
+                (document.getElementById(qBody + "1").checked == false) &&
+                (document.getElementById(qBody + "2").checked == false) &&
+                (document.getElementById(qBody + "3").checked == false) &&
+                (document.getElementById(qBody + "4").checked == false)
+            ) {
+                oldQButt.classList.add("empty");
+            } else {
+                oldQButt.classList.remove("empty");
+            }
+
+            activeQ = q;
+            activeN = qNo;
+        }
+
+        if (qNo == 1) {
+            prevButt.style.display = "none";
+            nextButt.style.display = "inline";
+            submitButt.style.display = "none";
+        } else if (qNo == totalQuestions) {
+            nextButt.style.display = "none";
+            prevButt.style.display = "inline";
+            submitButt.style.display = "inline";
+        } else {
+            nextButt.style.display = "inline";
+            prevButt.style.display = "inline";
+            submitButt.style.display = "none";
+        }
+    };
+
+    questionClick = function(data) {
+        switchQuestion(data.target.value);
+    };
+
+    // Build question UI
+    for (var j in set) {
+        const li = document.createElement("li");
+        li.classList = "nos options active";
+        li.innerHTML = count;
+        li.onclick = questionClick;
+        li.id = "s" + count;
+        li.value = count;
+        listy.appendChild(li);
+
+        const mC = document.createElement("div");
+        mC.id = "q" + count;
+        
+        const opt0 = set[j][0].replace(/"/g, '&quot;');
+        const opt1 = set[j][1].replace(/"/g, '&quot;');
+        const opt2 = set[j][2].replace(/"/g, '&quot;');
+        const opt3 = set[j][3].replace(/"/g, '&quot;');
+
+        mC.innerHTML = `<h2><center>QUESTION ${count}</center></h2>
+        <div class="question">
+            <p>${j}</p>
+                <label class="options"><input id="${j}1" type="radio" name="${j}" value="${opt0}"> ${set[j][0]}</label><br><br>
+                <label class="options"><input id="${j}2" type="radio" name="${j}" value="${opt1}"> ${set[j][1]}</label><br><br>
+                <label class="options"><input id="${j}3"  type="radio" name="${j}" value="${opt2}"> ${set[j][2]}</label><br><br>
+                <label class="options"><input id="${j}4"  type="radio" name="${j}" value="${opt3}"> ${set[j][3]}</label>
+        </div>`;
+
+        if (count != 1) {
+            mC.style.display = "none";
+            li.classList.remove("active");
+        }
+        activeQ = document.getElementById("q1");
+        mother.appendChild(mC);
+        count++;
+    }
+
+    // ----------------------------------------------------------------
+    // Unanswered question check before submit
+    // ----------------------------------------------------------------
+    function checkUnansweredQuestions() {
+        let allAnswered = true;
+        for (var i = 1; i <= Object.keys(set).length; i++) {
+            let qBody = document.querySelector("#q" + i + " p").innerHTML;
+            if (
+                document.getElementById(qBody + "1").checked == false &&
+                document.getElementById(qBody + "2").checked == false &&
+                document.getElementById(qBody + "3").checked == false &&
+                document.getElementById(qBody + "4").checked == false
+            ) {
+                allAnswered = false;
+                document.getElementById("s" + i).classList.add("empty");
+            } else {
+                document.getElementById("s" + i).classList.remove("empty");
+            }
+        }
+        return allAnswered;
+    }
+
+    document.getElementById("submitButt").addEventListener("click", function(event) {
+        if (!checkUnansweredQuestions()) {
+            event.preventDefault();
+            const popup = document.getElementById("emptyPopup");
+            popup.classList.add("proctor-popup--show");
+            setTimeout(() => {
+                popup.classList.remove("proctor-popup--show");
+            }, 5000);
+        } else {
+            if (!confirm("Are you sure you want to submit? You cannot change your answers after submission.")) {
+                event.preventDefault();
+            } else {
+                // Submission confirmed — suppress all violations during
+                // the navigation away (which fires blur/visibilitychange).
+                isExamActive = false;
+                startGracePeriod(5000);
+            }
+        }
+    });
+
+</script>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttentionGuard — Teacher Portal</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="teacher-body">
+
+    <header class="teacher-header">
+        <div class="teacher-header-left">
+            <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuard Logo">
+            <span class="AttentionGuard" style="font-size:1.2em;">Attention<span class="gold-text">Guard</span></span>
+        </div>
+        <div class="teacher-header-right">
+            <span class="teacher-tag">Teacher: {{ regno }}</span>
+            <a href="/teacher/upload" class="header-create-btn">+ New Question Set</a>
+            <a href="/logout" class="header-logout-btn">Logout</a>
+        </div>
+    </header>
+
+    <div class="teacher-container">
+
+        {% with messages = get_flashed_messages(with_categories=True) %}
+          {% if messages %}
+            <div class="flashes" style="margin-bottom:18px;">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                  {% if category == 'success' and 'Test code:' in message %}
+                    {{ message.split('Test code:')[0] }}
+                    <br>
+                    <span class="code-highlight">Test Code: {{ message.split('Test code:')[1].strip() }}</span>
+                  {% else %}
+                    {{ message }}
+                  {% endif %}
+                  <button class="close-btn" onclick="this.parentElement.style.display='none';">&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div class="teacher-page-title">
+            <h2>Your Question Sets</h2>
+            <a href="/teacher/upload" class="create-btn">+ Create New Question Set</a>
+        </div>
+
+        {% if question_sets %}
+        <div class="qs-table-wrapper">
+            <table class="qs-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Test Code</th>
+                        <th>Duration</th>
+                        <th>Retakes</th>
+                        <th>Questions</th>
+                        <th>Attempts</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for qs in question_sets %}
+                    {% set qs_display_title = qs.get('title', 'Untitled') %}
+                    {% set qs_delete_title = qs.get('title', qs.code) %}
+                    <tr>
+                        <td class="qs-title">{{ qs_display_title }}</td>
+                        <td>
+                            <div class="code-badge-container" style="display:inline-flex; align-items:center; gap:6px;">
+                                <code class="code-badge" id="badge-{{ qs.code }}">{{ qs.code }}</code>
+                                <button class="copy-badge-btn" onclick="copyToClipboard('{{ qs.code }}', this)" title="Copy test code" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:2px; display:inline-flex; align-items:center; transition:var(--transition-smooth);">
+                                    📋
+                                </button>
+                            </div>
+                        </td>
+                        <td class="center-cell">{{ qs.get('duration_minutes', 15) }}m</td>
+                        <td class="center-cell">
+                            {% if qs.get('max_attempts', 1) == 0 %}
+                                <span class="badge-status-yes" style="color:var(--color-success); font-weight:600; font-size:13.5px;">Yes</span>
+                            {% else %}
+                                <span class="badge-status-no" style="color:var(--text-muted); font-size:13.5px;">No</span>
+                            {% endif %}
+                        </td>
+                        <td class="center-cell">{{ qs.questions | length }}</td>
+                        <td class="center-cell">{{ qs.attempt_count }}</td>
+                        <td class="center-cell">
+                            {% if qs.get('created_at') %}
+                                {{ qs.created_at.strftime('%b %d, %Y') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/invigilator/{{ qs.code }}" class="view-btn">View Results</a>
+                            <form action="/teacher/delete/{{ qs.code }}" method="post" style="display:inline;">
+                                <button type="submit" class="delete-btn"
+                                    data-title="{{ qs_delete_title }}"
+                                    onclick="return confirm('Delete question set \'' + this.getAttribute('data-title') + '\'? This cannot be undone.')">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>You haven't created any question sets yet.</p>
+            <a href="/teacher/upload" class="create-btn">Upload your first question set</a>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text).then(function() {
+                const originalText = btn.textContent;
+                btn.textContent = '✅';
+                btn.style.color = 'var(--color-success)';
+                btn.setAttribute('title', 'Copied!');
+                
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.style.color = 'var(--text-muted)';
+                    btn.setAttribute('title', 'Copy test code');
+                }, 1500);
+            }).catch(function(err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+    </script>
+
+</body>
+</html>

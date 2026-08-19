@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AttentionGuard - Student Registration</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="form">
+  <header class="headrule">
+    <div class="brand">
+      <img class="logo" src="{{ url_for('static', filename='images/ninja.png') }}" alt="AttentionGuardLogo">
+      <h1 class="AttentionGuard">Attention<span class="gold-text">Guard</span></h1>
+    </div>
+  </header>
+
+  <section class="formbody">
+    <div class="hero-showcase">
+      <div class="badge-premium">
+        Student Portal
+      </div>
+      <h2 class="hero-title">Create Your <br><span class="gold-gradient">Student Account.</span></h2>
+      <p class="hero-subtitle">Join AttentionGuard to take AI-proctored online assessments with instant scoring and detailed
+        feedback.</p>
+
+      <div class="feature-grid">
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">📝</span>
+            <span class="feat-pulse"></span>
+          </div>
+          <div class="feat-text">
+            <h4>One-Time Registration</h4>
+            <p>Use your unique Register Number across all your tests.</p>
+          </div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">🔒</span>
+          </div>
+          <div class="feat-text">
+            <h4>Encrypted Security</h4>
+            <p>Passwords securely hashed using modern cryptographic standards.</p>
+          </div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-container">
+            <span class="feat-icon">⚡</span>
+          </div>
+          <div class="feat-text">
+            <h4>Instant Access</h4>
+            <p>Sign in immediately after registering and enter your exam code.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <h1 class="signin">Register</h1>
+
+      {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+      <div class="flashes">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">
+          {{ message }}
+          <button class="close-btn" onclick="this.parentElement.style.display='none';">&times;</button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <form action="" method="post">
+        <input class="input" type="text" id="name" name="name" placeholder="Full Name"
+          value="{{ name if name else '' }}" required autocomplete="name">
+        <input class="input" type="text" id="regno" name="regno" placeholder="Register Number (e.g. 2548547)"
+          value="{{ regno if regno else '' }}" required autocomplete="username">
+        <input class="input" type="password" id="pw" name="pw" placeholder="Password (min 4 characters)" required
+          autocomplete="new-password">
+        <input class="input" type="password" id="cpw" name="cpw" placeholder="Confirm Password" required
+          autocomplete="new-password">
+
+        <div class="wrap" style="margin-top: 10px;">
+          <button class="signbutton" type="submit">Create Account</button>
+        </div>
+      </form>
+
+      <div
+        style="margin-top: 25px; text-align: center; font-family: var(--font-body); font-size: 13.5px; color: var(--text-secondary);">
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}"
+          style="color: var(--color-gold); font-weight: 600; text-decoration: none; transition: var(--transition-smooth); margin-left: 4px;">
+          Sign In here &rarr;
+        </a>
+      </div>
+    </div>
+  </section>
+
+</body>
+
+</html>
