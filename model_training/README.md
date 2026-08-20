@@ -12,7 +12,8 @@
 
 ---
 
-### **M.Sc. Artificial Intelligence & Machine Learning Project**
+### **M.Sc. Artificial Intelligence & Machine Learning**
+### **Computer Vision Project**
 **Department of Computer Science | Christ Deemed to be University, Bangalore**  
 **Academic Supervisor:** Prof. Nizar Banu P K | **Academic Year:** 2025 – 2026
 
