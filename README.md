@@ -12,8 +12,22 @@
 
 ---
 
+### **M.Sc. Artificial Intelligence & Machine Learning**
+### **Computer Vision Project**
+**Department of Computer Science | Christ Deemed to be University, Bangalore**  
+**Academic Supervisor:** Prof. Nizar Banu P K | **Academic Year:** 2025 – 2026
 
 </div>
+
+---
+
+## 👥 Authors & Team Details
+
+| Team Member | Register Number | Project Role | Specialization & Contribution |
+|---|---|---|---|
+| **Satyam Chaturvedi** | `2548547` | **Lead Vision Architect & Deep Learning Pipeline** | **EyeStateNet (3-Block CNN)** architecture, PyTorch training pipeline, MRL dataset curation, and ONNX Runtime CPU inference acceleration. |
+| **Shruti Sharma** | `2548554` | **Client Edge Vision & Perception Engineer** | **MediaPipe Face Mesh (WASM)** client pipeline (30 FPS), 3D head pose ($X/Y$ offset), iris-to-canthi gaze deflection, and EAR blink tracking. |
+| **Huda Maniyar** | `2548526` | **Server Biometrics & Backend Analytics** | **InsightFace (SCRFD + 512D ArcFace)** cosine similarity matching, Flask-SocketIO async loop, MongoDB Atlas telemetry, and Invigilator dashboard. |
 
 ---
 
@@ -85,13 +99,17 @@ Remote computerized examinations are highly susceptible to academic dishonesty, 
                                                                    └── NO  ──► Push Real-Time Warning
 ```
 
-### Mathematical Formulations:
-1. **ArcFace Additive Angular Margin Loss:**
-   $$\mathcal{L}_{\text{ArcFace}} = -\frac{1}{N}\sum_{i=1}^N \log \frac{e^{s \cdot \cos(\theta_{y_i} + m)}}{e^{s \cdot \cos(\theta_{y_i} + m)} + \sum_{j \neq y_i} e^{s \cdot \cos\theta_j}}$$
-2. **Eye Aspect Ratio (EAR):**
-   $$\text{EAR} = \frac{\|p_2 - p_6\|_2 + \|p_3 - p_5\|_2}{2.0 \cdot \|p_1 - p_4\|_2}$$
-3. **Coordinate-Invariant Head Pose Normalization:**
-   $$X_{\text{offset}} = \frac{\text{noseTip.x} - \min(\text{leftCheek.x}, \text{rightCheek.x})}{\max(\text{leftCheek.x}, \text{rightCheek.x}) - \min(\text{leftCheek.x}, \text{rightCheek.x})}$$
+### Core Mathematical Formulations:
+* **1. ArcFace Additive Angular Margin Loss:**
+  $$\mathcal{L}_{\mathrm{ArcFace}} = -\frac{1}{N}\sum_{i=1}^N \log \frac{e^{s \cdot \cos(\theta_{y_i} + m)}}{e^{s \cdot \cos(\theta_{y_i} + m)} + \sum_{j \neq y_i} e^{s \cdot \cos\theta_j}}$$
+  *(where scale $s = 64$ and angular margin $m = 0.50$)*
+
+* **2. Eye Aspect Ratio (EAR):**
+  $$\mathrm{EAR} = \frac{\|p_2 - p_6\| + \|p_3 - p_5\|}{2.0 \cdot \|p_1 - p_4\|}$$
+  *(where $p_1, p_4$ are eye corners, and $p_2, p_3, p_5, p_6$ are eyelid landmarks)*
+
+* **3. Coordinate-Invariant Head Pose Normalization:**
+  $$X_{\mathrm{offset}} = \frac{\mathrm{noseTip.x} - \min(\mathrm{leftCheek.x}, \mathrm{rightCheek.x})}{\max(\mathrm{leftCheek.x}, \mathrm{rightCheek.x}) - \min(\mathrm{leftCheek.x}, \mathrm{rightCheek.x})}$$
 
 ---
 
@@ -218,3 +236,5 @@ AttentionGuard/
     ├── static/                         # CSS stylesheets, icons, and assets
     └── templates/                      # Glassmorphic Jinja2 HTML templates
 ```
+
+---
