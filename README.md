@@ -99,7 +99,7 @@ Remote computerized examinations are highly susceptible to academic dishonesty, 
 
 ### 1. Classification & Verification Accuracy
 
-| Evaluation Metric | Face Verification (ArcFace) | Eye State (EyeStateNet v2) | Iris Gaze Tracking | 3D Head Pose Estimation |
+| Evaluation Metric | Face Verification (ArcFace) | Eye State (EyeStateNet) | Iris Gaze Tracking | 3D Head Pose Estimation |
 |---|---|---|---|---|
 | **Accuracy** | **99.65%** | **98.40%** | **96.85%** | **97.20%** |
 | **Precision** | 99.70% | 98.62% | 96.50% | 97.10% |
@@ -178,7 +178,7 @@ Open your web browser and navigate to **`http://localhost:5100`**.
 
 ## 🧠 Model Training & Google Colab Notebook
 
-To retrain or evaluate **EyeStateNet v2** on the MRL Eye Dataset:
+To retrain or evaluate **EyeStateNet** on the MRL Eye Dataset:
 * Run locally:
   ```bash
   python model_training/train_eye_state.py
@@ -198,7 +198,7 @@ AttentionGuard/
 ├── README.md                           # Master project documentation
 ├── TEAM_WORK_DIVISION_AND_VIVA_GUIDE.md # Team roles, CV model mapping & viva defense guide
 │
-├── model_training/                     # Custom EyeStateNet v2 CNN training pipeline
+├── model_training/                     # Custom EyeStateNet CNN training pipeline
 │   ├── train_eye_state.py              # PyTorch training & ONNX export script
 │   ├── evaluate.py                     # Evaluation & confusion matrix script
 │   ├── EyeStateClassifier_Colab.ipynb  # Google Colab GPU training notebook
