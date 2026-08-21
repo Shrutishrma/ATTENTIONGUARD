@@ -87,8 +87,14 @@
                         <td class="center-cell">{{ qs.questions | length }}</td>
                         <td class="center-cell">{{ qs.attempt_count }}</td>
                         <td class="center-cell">
-                            {% if qs.get('created_at') %}
-                                {{ qs.created_at.strftime('%b %d, %Y') }}
+                            {% if qs.get('created_at_display') %}
+                                {{ qs.created_at_display }}
+                            {% elif qs.get('created_at') %}
+                                {% if qs.created_at.strftime is defined %}
+                                    {{ qs.created_at.strftime('%b %d, %Y') }}
+                                {% else %}
+                                    {{ qs.created_at }}
+                                {% endif %}
                             {% else %}
                                 —
                             {% endif %}

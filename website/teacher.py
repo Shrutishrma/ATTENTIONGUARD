@@ -39,6 +39,17 @@ def dashboard():
         qs['attempt_count'] = current_app.mongo.db.user.count_documents(
             {f"completed_tests.{qs['code']}": {"$exists": True}}
         )
+        created = qs.get('created_at')
+        if isinstance(created, datetime):
+            qs['created_at_display'] = created.strftime('%b %d, %Y')
+        elif isinstance(created, str) and created.strip():
+            try:
+                dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                qs['created_at_display'] = dt.strftime('%b %d, %Y')
+            except Exception:
+                qs['created_at_display'] = created[:10]
+        else:
+            qs['created_at_display'] = '—'
     return render_template('teacher_dashboard.html',
                            question_sets=question_sets,
                            regno=session['regno'])
