@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,14 +8,16 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ninja.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
-    <!-- MediaPipe Face Mesh for client-side gaze/head/eye tracking -->
+    <!-- MediaPipe Face Mesh for client-side head tracking -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 </head>
-<body class="questionpage" oncontextmenu="return false" id="testBody" data-questions="{{ question_dict }}" data-regno="{{ regno }}">
+
+<body class="questionpage" oncontextmenu="return false" id="testBody" data-questions="{{ question_dict }}"
+    data-regno="{{ regno }}">
     <video id="video" width="320" height="240" style="display:none" autoplay></video>
     <canvas id="proctorCanvas" width="320" height="240" style="display:none"></canvas>
- 
+
     <!-- Proctoring Status Bar -->
     <div id="proctorBar" class="proctor-bar">
         <div class="proctor-status">
@@ -59,8 +62,9 @@
                 <h1 class="AttentionGuardq">Attention<span class="gold-text">Guard</span></h1>
             </header>
             <div class="timer">
-                <img class="timerimg" src="{{ url_for('static', filename='images/timer.png') }}" alt="image of a timer" width="40"/>
-                <span id="timer">  00:15:00</span>
+                <img class="timerimg" src="{{ url_for('static', filename='images/timer.png') }}" alt="image of a timer"
+                    width="40" />
+                <span id="timer"> 00:15:00</span>
             </div>
         </div>
         <div class="content">
@@ -77,9 +81,11 @@
                 <div id="mother">
                 </div>
                 <div class="navigation">
-                    <button type="button" class="buttonquestion" id="prev" style="display:none" onclick="switchQuestion(activeN-1)">PREVIOUS</button>
-                    <button type="button" class="buttonquestion" id="next" onclick="switchQuestion(activeN+1)">NEXT</button>
-                    <input type="submit" id="submitButt" style="display:none" value="SUBMIT"/>
+                    <button type="button" class="buttonquestion" id="prev" style="display:none"
+                        onclick="switchQuestion(activeN-1)">PREVIOUS</button>
+                    <button type="button" class="buttonquestion" id="next"
+                        onclick="switchQuestion(activeN+1)">NEXT</button>
+                    <input type="submit" id="submitButt" style="display:none" value="SUBMIT" />
                 </div>
             </form>
         </div>
@@ -220,7 +226,7 @@
         // History manipulation (prevent back button)
         // ----------------------------------------------------------------
         history.pushState(null, null, location.href);
-        window.addEventListener('popstate', function(event) {
+        window.addEventListener('popstate', function (event) {
             window.location.href = "{{ url_for('auth.logout') }}";
         });
 
@@ -319,7 +325,7 @@
 
             const elem = document.documentElement;
             let fsPromise = null;
-            
+
             try {
                 if (elem.requestFullscreen) {
                     fsPromise = elem.requestFullscreen();
@@ -333,7 +339,7 @@
             } catch (err) {
                 console.error("Fullscreen error:", err);
             }
-            
+
             // NUCLEAR: Remove overlay from DOM entirely
             nukeOverlay();
             startEnforcer();
@@ -354,41 +360,41 @@
         function isFullscreen() {
             // 1. Standard Native check
             const isNative = !!(
-                document.fullscreenElement || 
-                document.webkitFullscreenElement || 
-                document.mozFullScreenElement || 
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement ||
                 document.msFullscreenElement ||
                 document.webkitIsFullScreen ||
                 document.mozFullScreen ||
                 document.msFullscreen
             );
-            
+
             // 2. Media Query check (extremely reliable for both F11 and JS fullscreen under zoom)
             const isMediaQuery = window.matchMedia('(display-mode: fullscreen)').matches;
-            
+
             // 3. Zoom-safe viewport height vs window outer height check.
             // In windowed mode, tabs + address bar + bookmark bar take at least 60px of vertical space.
             // In fullscreen mode (native or F11), browser chrome is hidden, so inner height matches outer height.
             const isViewportFS = Math.abs(window.innerHeight - window.outerHeight) < 25;
-            
+
             // 4. Zoom-safe screen dimensions matching outer window dimensions.
             // In fullscreen mode, the browser window must cover the entire monitor area.
             const screenW = window.screen.width;
             const screenH = window.screen.height;
-            const isScreenFS = (Math.abs(window.outerWidth - screenW) < 25 && 
-                                Math.abs(window.outerHeight - screenH) < 25);
-            
+            const isScreenFS = (Math.abs(window.outerWidth - screenW) < 25 &&
+                Math.abs(window.outerHeight - screenH) < 25);
+
             // 5. Ratio fallback check (for complex Multi-monitor or Virtual Desktop scaling)
             const ratioH = window.innerHeight / screenH;
             const ratioW = window.innerWidth / screenW;
             const isRatioFS = ratioW > 0.90 && ratioH > 0.90;
-                                      
+
             return isNative || isMediaQuery || (isViewportFS && isScreenFS) || isRatioFS;
         }
 
         function onFullscreenChange() {
             console.log('[FS-FIX] fullscreenchange event fired');
-            
+
             const checkIntervals = [50, 200, 500, 1000];
             checkIntervals.forEach((delay) => {
                 setTimeout(() => {
@@ -719,4 +725,5 @@
     <!-- Question navigation and anti-cheat keyboard/tab-switch handlers -->
     {% include "questionPageScript.html" %}
 </body>
+
 </html>
